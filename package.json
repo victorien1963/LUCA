@@ -1,0 +1,14 @@
+{
+  "name": "LUCA",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Wavenet RD",
+  "license": "MIT",
+  "scripts": {
+    "start": "concurrently \"yarn auth-server\" \"yarn luca-service\" \"yarn marketing-api-server\" \"yarn luca-web\"",
+    "luca-web":"yarn --cwd ~/packages/luca-web/ start",
+    "auth-server":"yarn --cwd ~/packages/auth-server/ start",
+    "luca-server":"yarn --cwd ~/packages/luca-server/ start",
+    "marketing-api-server":"yarn --cwd ~/packages/marketing-api-server/ start"
+  }
+}

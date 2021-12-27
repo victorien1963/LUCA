@@ -1,0 +1,9 @@
+[submodule "packages/auth-server"]
+	path = packages/auth-server
+	url = https://github.com/selikastraying/auth-server.git
+[submodule "packages/luca-web"]
+	path = packages/luca-web
+	url = https://github.com/selikastraying/luca-web.git
+[submodule "packages/marketing-api-server"]
+	path = packages/marketing-api-server
+	url = https://github.com/selikastraying/marketing-api-server.git

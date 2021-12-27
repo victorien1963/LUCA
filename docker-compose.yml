@@ -1,0 +1,119 @@
+version: '3.3'
+
+services:
+  traefik:
+    image: traefik:v2.1
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --certificatesresolvers.myresolver.acme.tlschallenge=true
+      - --certificatesresolvers.myresolver.acme.email=aws_cloud@wavenet.com.tw
+      - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.myresolver.acme.dnsChallenge.provider=cloudflare
+      - --certificatesresolvers.myresolver.acme.dnsChallenge.delayBeforeCheck=0
+      - --certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+    labels:
+      - "traefik.http.routers.http_catchall.rule=HostRegexp(`{any:.+}`)"
+      - "traefik.http.routers.http_catchall.entrypoints=web"
+      - "traefik.http.routers.http_catchall.middlewares=https_redirect"
+      - "traefik.http.middlewares.https_redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https_redirect.redirectscheme.permanent=true"
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_API_KEY=${CF_API_KEY}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./letsencrypt:/letsencrypt
+    container_name: "traefik"
+
+  luca-web:
+    build:
+      context: ./packages/luca-web
+    restart: always
+    ports:
+      - 3000:3000
+    environment: 
+      - REACT_APP_AUTH_URL=${AUTH_URL}
+      - REACT_APP_DOMAIN=${DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.tls.certresolver=myresolver"
+      - "traefik.http.routers.app.rule=Host(`${LUCA_WEB_HOST}`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
+    container_name: "luca-web"
+
+  luca-server:
+    build:
+      context: ./packages/luca-server
+    restart: always
+    ports:
+      - 7002:7002
+    environment: 
+      - DB_CONNECTION=${DB_CONNECTION}
+      - MAIL_SERVICE=${MAIL_SERVICE}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - MANAGER_EMAIL_ADDRESS=${MANAGER_EMAIL_ADDRESS}
+    depends_on:
+      - "mongo"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app2.tls.certresolver=myresolver"
+      - "traefik.http.routers.app2.rule=Host(`${SERVER_HOST}`)"
+      - "traefik.http.routers.app2.entrypoints=websecure"
+      - "traefik.http.services.app2.loadbalancer.server.port=7002"
+    container_name: "luca-server"
+  
+  auth-server:
+    build:
+      context: ./packages/auth-server
+    restart: always
+    ports:
+      - 7001:7001
+    environment: 
+      - MARKETING_API_SERVER_URL=${MARKETING_API_SERVER_URL}
+      - LUCA_SERVER_URL=${LUCA_SERVER_URL}
+      - DB_CONNECTION=${DB_CONNECTION}
+    depends_on:
+      - "mongo"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app2.tls.certresolver=myresolver"
+      - "traefik.http.routers.app2.rule=Host(`${AUTH_HOST}`)"
+      - "traefik.http.routers.app2.entrypoints=websecure"
+      - "traefik.http.services.app2.loadbalancer.server.port=7001"
+    container_name: "auth-server"
+
+  marketing-api-server:
+    build:
+      context: ./packages/marketing-api-server
+    restart: always
+    ports:
+      - 7003:7003
+    environment: 
+      - DB_CONNECTION=${DB_CONNECTION}
+    depends_on:
+      - "mongo"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app2.tls.certresolver=myresolver"
+      - "traefik.http.routers.app2.rule=Host(`${MARKETING_API_SERVER_HOST}`)"
+      - "traefik.http.routers.app2.entrypoints=websecure"
+      - "traefik.http.services.app2.loadbalancer.server.port=7002"
+    container_name: "marketing-api-server"
+
+  mongo:
+    image: mongo
+    restart: always
+    volumes:
+      - ./mongo/data/mongo:/data/db
+
+networks:
+  web:
